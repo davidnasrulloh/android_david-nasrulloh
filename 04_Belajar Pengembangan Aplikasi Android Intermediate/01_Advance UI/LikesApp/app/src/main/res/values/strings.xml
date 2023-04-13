@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">LikesApp</string>
+    <string name="like">Suka</string>
+    <string name="dislike">Tidak Suka</string>
+
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <string name="tab_text_1">Latihan 1</string>
+    <string name="tab_text_2">Latihan 2</string>
+</resources>
