@@ -1,0 +1,129 @@
+package com.remote.myunlimitedquotes.ui
+
+import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.paging.AsyncPagingDataDiffer
+import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListUpdateCallback
+import com.remote.myunlimitedquotes.DataDummy
+import com.remote.myunlimitedquotes.MainDispatcherRule
+import com.remote.myunlimitedquotes.adapter.QuoteListAdapter
+import com.remote.myunlimitedquotes.data.QuoteRepository
+import com.remote.myunlimitedquotes.getOrAwaitValue
+import com.remote.myunlimitedquotes.network.QuoteResponseItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.mockito.Mock
+import org.mockito.Mockito
+import org.mockito.junit.MockitoJUnitRunner
+
+@ExperimentalCoroutinesApi
+@RunWith(MockitoJUnitRunner::class)
+class MainViewModelTest{
+    @get:Rule
+    val instantExecutorRule = InstantTaskExecutorRule()
+    @get:Rule
+    val mainDispatcherRules = MainDispatcherRule()
+    @Mock
+    private lateinit var quoteRepository: QuoteRepository
+
+    //memanggil data quote yang berupa PagingData seperti berikut.
+    @Test
+    fun `when Get Quote Should Not Null and Return Data`() = runTest {
+        val dummyQuote = DataDummy.generateDummyQuoteResponse()
+        val data: PagingData<QuoteResponseItem> = QuotePagingSource.snapshot(dummyQuote)
+        val expectedQuote = MutableLiveData<PagingData<QuoteResponseItem>>()
+        expectedQuote.value = data
+        Mockito.`when`(quoteRepository.getQuote()).thenReturn(expectedQuote)
+
+        val mainViewModel = MainViewModel(quoteRepository)
+        val actualQuote: PagingData<QuoteResponseItem> = mainViewModel.quote.getOrAwaitValue()
+
+
+        // memeriksa ketersediaan dan jumlah data dari adapter
+        val differ = AsyncPagingDataDiffer(
+            diffCallback = QuoteListAdapter.DIFF_CALLBACK,
+            updateCallback = noopListUpdateCallback,
+            workerDispatcher = Dispatchers.Main,
+        )
+        differ.submitData(actualQuote)
+
+        Assert.assertNotNull(differ.snapshot())
+        Assert.assertEquals(dummyQuote.size, differ.snapshot().size)
+        Assert.assertEquals(dummyQuote[0].author, differ.snapshot()[0]?.author)
+
+    }
+
+    //masukkan PagingData ke dalam adapter supaya diperiksa datanya dengan menggunakan bantuan
+    @Test
+    fun `when Get Quote Should Not Null`() = runTest {
+        val dummyQuote = DataDummy.generateDummyQuoteResponse()
+        val data: PagingData<QuoteResponseItem> = QuotePagingSource.snapshot(dummyQuote)
+        val expectedQuote = MutableLiveData<PagingData<QuoteResponseItem>>()
+        expectedQuote.value = data
+
+        Mockito.`when`(quoteRepository.getQuote()).thenReturn(expectedQuote)
+        val mainViewModel = MainViewModel(quoteRepository)
+        val actualQuote: PagingData<QuoteResponseItem> = mainViewModel.quote.getOrAwaitValue()
+
+        val differ = AsyncPagingDataDiffer(
+            diffCallback = QuoteListAdapter.DIFF_CALLBACK,
+            updateCallback = noopListUpdateCallback,
+            workerDispatcher = Dispatchers.Main,
+        )
+        differ.submitData(actualQuote)
+
+    }
+
+    //untuk pengujian negative case ketika tidak ada data.
+    @Test
+    fun `when Get Quote Empty Should Return No Data`() = runTest {
+        val data: PagingData<QuoteResponseItem> = PagingData.from(emptyList())
+        val expectedQuote = MutableLiveData<PagingData<QuoteResponseItem>>()
+        expectedQuote.value = data
+        Mockito.`when`(quoteRepository.getQuote()).thenReturn(expectedQuote)
+        val mainViewModel = MainViewModel(quoteRepository)
+        val actualQuote: PagingData<QuoteResponseItem> = mainViewModel.quote.getOrAwaitValue()
+        val differ = AsyncPagingDataDiffer(
+            diffCallback = QuoteListAdapter.DIFF_CALLBACK,
+            updateCallback = noopListUpdateCallback,
+            workerDispatcher = Dispatchers.Main,
+        )
+        differ.submitData(actualQuote)
+        Assert.assertEquals(0, differ.snapshot().size)
+    }
+
+
+
+}
+
+val noopListUpdateCallback = object : ListUpdateCallback {
+    override fun onInserted(position: Int, count: Int) {}
+    override fun onRemoved(position: Int, count: Int) {}
+    override fun onMoved(fromPosition: Int, toPosition: Int) {}
+    override fun onChanged(position: Int, count: Int, payload: Any?) {}
+}
+
+class QuotePagingSource : PagingSource<Int, LiveData<List<QuoteResponseItem>>>() {
+    companion object {
+        fun snapshot(items: List<QuoteResponseItem>): PagingData<QuoteResponseItem> {
+            return PagingData.from(items)
+        }
+    }
+    override fun getRefreshKey(state: PagingState<Int, LiveData<List<QuoteResponseItem>>>): Int {
+        return 0
+    }
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, LiveData<List<QuoteResponseItem>>> {
+        return LoadResult.Page(emptyList(), 0, 1)
+    }
+}
